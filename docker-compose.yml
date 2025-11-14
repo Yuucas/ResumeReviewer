@@ -1,0 +1,94 @@
+services:
+  # Ollama service (LLM backend)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: resume-rag-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+      - ./docker/init-ollama.sh:/init-ollama.sh
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+    restart: unless-stopped
+    networks:
+      - resume-rag-network
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: resume-rag-backend
+    depends_on:
+      - ollama
+    ports:
+      - "8000:8000"
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - EMBEDDING_MODEL=nomic-embed-text
+      - LLM_MODEL=qwen3:latest
+      - DATASET_ROOT=/app/dataset
+      - CHROMA_DB_PATH=/app/chroma_db
+      - CACHE_DIR=/app/.cache
+      - OUTPUT_DIR=/app/output
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./dataset:/app/dataset
+      - ./src:/app/src
+      - ./chroma_db:/app/chroma_db
+      - ./.cache:/app/.cache
+      - ./output:/app/output
+      - ./backend/app:/app/app
+    restart: unless-stopped
+    networks:
+      - resume-rag-network
+
+  # Frontend React/Vite Application
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: resume-rag-frontend
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    restart: unless-stopped
+    networks:
+      - resume-rag-network
+
+  # Resume RAG CLI (original container)
+  resume-rag:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: resume-rag-app
+    depends_on:
+      - ollama
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - EMBEDDING_MODEL=nomic-embed-text
+      - LLM_MODEL=qwen2.5:latest
+      - DATASET_ROOT=/app/dataset
+      - CHROMA_DB_PATH=/app/chroma_db
+      - CACHE_DIR=/app/.cache
+      - OUTPUT_DIR=/app/output
+    volumes:
+      - ./dataset:/app/dataset:ro
+      - ./chroma_db:/app/chroma_db
+      - ./.cache:/app/.cache
+      - ./output:/app/output
+    stdin_open: true
+    tty: true
+    command: /bin/bash
+
+networks:
+  resume-rag-network:
+    driver: bridge
+
+volumes:
+  ollama_data:
+    driver: local

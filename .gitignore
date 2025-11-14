@@ -1,0 +1,161 @@
+# ============================================
+# Python
+# ============================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ============================================
+# Virtual Environments
+# ============================================
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# ============================================
+# Jupyter Notebook
+# ============================================
+.ipynb_checkpoints
+*.ipynb
+
+# ============================================
+# IDEs and Editors
+# ============================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ============================================
+# Environment Variables (SENSITIVE!)
+# ============================================
+.env
+.env.local
+.env.*.local
+*.env
+
+# ============================================
+# Database Files (SENSITIVE - Contains embedded data)
+# ============================================
+chroma_db/
+*.db
+*.sqlite
+*.sqlite3
+
+# ============================================
+# Cache Directories
+# ============================================
+.cache/
+*.log
+logs/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# ============================================
+# Output Files
+# ============================================
+output/
+reports/
+*.txt
+*.json
+*.csv
+*.xlsx
+results/
+
+# ============================================
+# Docker
+# ============================================
+docker/wheels/
+
+# ============================================
+# Dataset (SENSITIVE - May contain personal data)
+# ============================================
+dataset/
+*.pdf
+*.docx
+*.doc
+
+# ============================================
+# Model Files (Large files)
+# ============================================
+models/
+*.bin
+*.pt
+*.pth
+*.onnx
+*.h5
+
+# ============================================
+# OS Files
+# ============================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ============================================
+# Testing
+# ============================================
+.pytest_cache/
+.coverage
+coverage.xml
+*.cover
+.hypothesis/
+
+# ============================================
+# Temporary Files
+# ============================================
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*~
+
+# ============================================
+# Documentation Build
+# ============================================
+docs/_build/
+site/
+
+# ============================================
+# Keep these files (exceptions)
+# ============================================
+!.gitkeep
+!dataset/.gitkeep
+!output/.gitkeep
+!.cache/.gitkeep
+!chroma_db/.gitkeep
