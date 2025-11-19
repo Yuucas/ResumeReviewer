@@ -71,7 +71,7 @@ services:
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
       - EMBEDDING_MODEL=nomic-embed-text
-      - LLM_MODEL=qwen2.5:latest
+      - LLM_MODEL=qwen3:latest
       - DATASET_ROOT=/app/dataset
       - CHROMA_DB_PATH=/app/chroma_db
       - CACHE_DIR=/app/.cache

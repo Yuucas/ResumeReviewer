@@ -273,55 +273,6 @@ npm run dev
 npm run build
 ```
 
-## 🐛 Troubleshooting
-
-### Common Issues
-
-**1. Backend can't find FastAPI**
-- This was fixed in the latest version
-- Ensure you're using the updated `backend/requirements.txt`
-- Rebuild containers: `docker-compose up --build`
-
-**2. Models not loading**
-```bash
-# Check if models are pulled
-docker exec -it resume-rag-ollama ollama list
-
-# Pull models if missing
-docker exec -it resume-rag-ollama ollama pull nomic-embed-text
-docker exec -it resume-rag-ollama ollama pull qwen3:latest
-```
-
-**3. Timeout errors during search**
-- LLM processing takes 30-60 seconds per candidate
-- Reduce `top_k` to 3 candidates for faster results
-- First search after startup is slower (model loading)
-
-**4. Port already in use**
-```bash
-# Check what's using the port
-netstat -ano | findstr :3000
-netstat -ano | findstr :8000
-
-# Stop containers and try again
-docker-compose down
-docker-compose up -d
-```
-
-**5. Out of memory**
-- Increase Docker memory in Docker Desktop
-- Settings → Resources → Memory → Set to 8GB+
-- Close other applications
-
-For more troubleshooting, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
-
-## 📊 Performance Tips
-
-1. **Reduce candidate count**: Use `top_k=3` instead of 5 for faster searches
-2. **GPU acceleration**: Uncomment GPU sections in `docker-compose.yml` if you have NVIDIA GPU
-3. **Pre-warm models**: Run a test search after startup to load models into memory
-4. **Batch uploads**: Upload multiple resumes at once, then re-index once
-
 ## 🤝 Contributing
 
 Contributions are welcome! Please:
@@ -348,16 +299,4 @@ MIT License - see [LICENSE](LICENSE) file for details
 
 For questions or issues, please open a [GitHub issue](https://github.com/Yuucas/ResumeReviewer/issues).
 
-## 🗺️ Roadmap
-
-- [ ] Advanced filtering (skills, education, location)
-- [ ] Resume comparison view
-- [ ] Export results to PDF/CSV
-- [ ] Multi-language support
-- [ ] Interview question suggestions
-- [ ] Authentication and user management
-- [ ] Cloud deployment guides (AWS, GCP, Azure)
-
 ---
-
-**Built with ❤️ using local AI - No data leaves your machine!**
