@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 import uvicorn
 
 # Use relative imports
-from .api import search, stats, health, upload
+from .api import search, stats, health, upload, debug
 
 # Create FastAPI app
 app = FastAPI(
@@ -31,6 +31,7 @@ app.include_router(health.router, prefix="/api", tags=["health"])
 app.include_router(search.router, prefix="/api", tags=["search"])
 app.include_router(stats.router, prefix="/api", tags=["statistics"])
 app.include_router(upload.router, prefix="/api", tags=["upload"])
+app.include_router(debug.router, prefix="/api", tags=["debug"])
 
 
 @app.get("/")

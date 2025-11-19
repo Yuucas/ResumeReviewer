@@ -205,7 +205,16 @@ class VectorDatabase:
             metadata['keywords_json'] = json.dumps(keywords)
         else:
             metadata['keywords_json'] = '[]'
-        
+
+        # Store extracted_info (including GitHub URL) as JSON string
+        extracted_info = chunk.metadata.get('extracted_info', {})
+        if extracted_info:
+            metadata['extracted_info'] = json.dumps(extracted_info)
+            if 'github' in extracted_info:
+                logger.info(f"✓ Saving GitHub URL to DB: {extracted_info['github']}")
+        else:
+            logger.debug(f"No extracted_info in chunk metadata for {chunk.source_file}")
+
         return metadata
     
     def search(self,

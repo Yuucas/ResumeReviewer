@@ -114,23 +114,15 @@ class RAGService:
             # Format results for API response
             results = []
             for candidate in candidates:
-                result = {
-                    "filename": candidate.filename,
-                    "match_score": candidate.match_score,
-                    "strengths": candidate.strengths,
-                    "weaknesses": candidate.weaknesses,
-                    "overall_assessment": candidate.overall_assessment,
-                    "recommendation": candidate.recommendation,
-                }
-                
-                # Add optional fields if they exist
-                if hasattr(candidate, 'years_of_experience'):
-                    result["experience_years"] = candidate.years_of_experience
-                if hasattr(candidate, 'role'):
-                    result["role"] = candidate.role
-                if hasattr(candidate, 'email'):
-                    result["email"] = candidate.email
-                
+                # Use to_dict() method to include all fields including GitHub data
+                result = candidate.to_dict()
+
+                # Debug: Log if GitHub data exists
+                if 'github' in result:
+                    logger.info(f"✓ GitHub data found for {candidate.filename}: @{result['github'].get('username')}")
+                else:
+                    logger.warning(f"✗ No GitHub data for {candidate.filename}")
+
                 results.append(result)
             
             return {

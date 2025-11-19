@@ -10,6 +10,7 @@ import json
 from dataclasses import dataclass
 
 from src.agents.prompt_templates import PromptBuilder, get_system_prompt
+from src.agents.github_analyzer import GitHubAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,7 @@ class CandidateAnalysis:
     role_category: str
     email: str
     years_of_experience: float
-    
+
     # LLM-generated analysis
     strengths: List[str]
     weaknesses: List[str]
@@ -31,14 +32,22 @@ class CandidateAnalysis:
     overall_assessment: str
     key_qualifications: List[str]
     recommendation: str  # 'strongly_recommend', 'recommend', 'maybe', 'not_recommended'
-    
+
     # Supporting data
     matched_chunks: List[Dict[str, Any]]
     similarity_score: float
-    
+
+    # GitHub analysis (optional)
+    github_username: Optional[str] = None
+    github_profile_url: Optional[str] = None
+    github_relevance_score: Optional[float] = None
+    github_top_languages: Optional[List[str]] = None
+    github_relevant_projects: Optional[List[Dict[str, Any]]] = None
+    github_summary: Optional[str] = None
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
-        return {
+        result = {
             'filename': self.filename,
             'role_category': self.role_category,
             'email': self.email,
@@ -52,23 +61,44 @@ class CandidateAnalysis:
             'similarity_score': self.similarity_score
         }
 
+        # Add GitHub data if available
+        if self.github_username:
+            result['github'] = {
+                'username': self.github_username,
+                'profile_url': self.github_profile_url,
+                'relevance_score': self.github_relevance_score,
+                'top_languages': self.github_top_languages,
+                'relevant_projects': self.github_relevant_projects,
+                'summary': self.github_summary
+            }
+
+        return result
+
 
 class ResumeAnalyzer:
     """
     Analyzes candidates using LLM intelligence.
     Provides detailed evaluations and hiring recommendations.
     """
-    
-    def __init__(self, llm_client):
+
+    def __init__(self, llm_client, enable_github_analysis: bool = True):
         """
         Initialize the analyzer.
-        
+
         Args:
             llm_client: OllamaClient instance
+            enable_github_analysis: Whether to analyze GitHub profiles (default: True)
         """
         self.llm_client = llm_client
-        
-        logger.info("ResumeAnalyzer initialized")
+        self.enable_github_analysis = enable_github_analysis
+
+        # Initialize GitHub analyzer if enabled
+        if self.enable_github_analysis:
+            self.github_analyzer = GitHubAnalyzer(llm_client=llm_client)
+        else:
+            self.github_analyzer = None
+
+        logger.info(f"ResumeAnalyzer initialized (GitHub analysis: {enable_github_analysis})")
     
     def analyze_candidate(self,
                          candidate,
@@ -76,23 +106,26 @@ class ResumeAnalyzer:
                          include_chunks: bool = True) -> CandidateAnalysis:
         """
         Perform detailed analysis of a single candidate.
-        
+
         Args:
             candidate: CandidateMatch object
             job_description: Job description/requirements
             include_chunks: Whether to include chunk data in analysis
-        
+
         Returns:
             CandidateAnalysis object
         """
         logger.info(f"Analyzing candidate: {candidate.filename}")
-        
+
         # Prepare candidate information
         candidate_info = self._prepare_candidate_info(candidate)
-        
+
         # Generate analysis using LLM
         analysis = self._llm_analyze(job_description, candidate_info)
-        
+
+        # Analyze GitHub profile if available and enabled
+        github_data = self._analyze_github_profile(candidate, job_description)
+
         # Create CandidateAnalysis object
         result = CandidateAnalysis(
             filename=candidate.filename,
@@ -106,13 +139,91 @@ class ResumeAnalyzer:
             key_qualifications=analysis.get('key_qualifications', []),
             recommendation=analysis.get('recommendation', 'maybe'),
             matched_chunks=candidate.matched_chunks if include_chunks else [],
-            similarity_score=candidate.average_similarity
+            similarity_score=candidate.average_similarity,
+            # GitHub data
+            github_username=github_data.get('username'),
+            github_profile_url=github_data.get('profile_url'),
+            github_relevance_score=github_data.get('relevance_score'),
+            github_top_languages=github_data.get('top_languages'),
+            github_relevant_projects=github_data.get('relevant_projects'),
+            github_summary=github_data.get('summary')
         )
-        
+
         logger.info(f"Analysis complete: {candidate.filename} - "
-                   f"Score: {result.match_score}/100")
-        
+                   f"Score: {result.match_score}/100"
+                   f"{' (with GitHub data)' if github_data.get('username') else ''}")
+
         return result
+
+    def _analyze_github_profile(self, candidate, job_description: str) -> Dict[str, Any]:
+        """
+        Analyze candidate's GitHub profile if available.
+
+        Args:
+            candidate: CandidateMatch object
+            job_description: Job description
+
+        Returns:
+            Dictionary with GitHub analysis data or empty dict if not available
+        """
+        if not self.enable_github_analysis or not self.github_analyzer:
+            return {}
+
+        # Try to get GitHub URL from candidate metadata
+        github_url = None
+
+        # Check if candidate has github field in metadata
+        if hasattr(candidate, 'github') and candidate.github:
+            github_url = candidate.github
+        # Check in matched_chunks metadata
+        elif hasattr(candidate, 'matched_chunks') and candidate.matched_chunks:
+            for chunk in candidate.matched_chunks:
+                if 'metadata' in chunk and 'extracted_info' in chunk['metadata']:
+                    extracted_info = chunk['metadata']['extracted_info']
+
+                    # Handle both dict and JSON string
+                    if isinstance(extracted_info, str):
+                        import json
+                        try:
+                            extracted_info = json.loads(extracted_info)
+                        except:
+                            continue
+
+                    if isinstance(extracted_info, dict):
+                        github = extracted_info.get('github')
+                        if github:
+                            github_url = f"https://{github}" if not github.startswith('http') else github
+                            break
+
+        if not github_url:
+            logger.debug(f"No GitHub URL found for candidate: {candidate.filename}")
+            return {}
+
+        # Analyze GitHub profile
+        try:
+            logger.info(f"Analyzing GitHub profile: {github_url}")
+            github_analysis = self.github_analyzer.analyze_github_profile(
+                github_url=github_url,
+                job_description=job_description,
+                max_repos=30
+            )
+
+            if github_analysis:
+                return {
+                    'username': github_analysis.username,
+                    'profile_url': github_analysis.profile_url,
+                    'relevance_score': github_analysis.relevance_score,
+                    'top_languages': github_analysis.top_languages,
+                    'relevant_projects': github_analysis.relevant_projects,
+                    'summary': github_analysis.summary
+                }
+            else:
+                logger.warning(f"GitHub analysis failed for: {github_url}")
+                return {}
+
+        except Exception as e:
+            logger.error(f"Error analyzing GitHub profile {github_url}: {str(e)}")
+            return {}
     
     def _prepare_candidate_info(self, candidate) -> str:
         """

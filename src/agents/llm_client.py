@@ -22,9 +22,9 @@ class OllamaClient:
     def __init__(self,
                  model: str = "llama3.2",
                  base_url: str = "http://localhost:11434",
-                 temperature: float = 0.7,
-                 max_tokens: int = 2000,
-                 timeout: int = 120):
+                 temperature: float = 0.4,
+                 max_tokens: int = 3000,
+                 timeout: int = 500):
         """
         Initialize Ollama client.
         
@@ -82,7 +82,7 @@ class OllamaClient:
             response = requests.post(
                 f"{self.base_url}/api/pull",
                 json={"name": self.model},
-                timeout=600  # 10 minutes for large models
+                timeout=900  # 10 minutes for large models
             )
             response.raise_for_status()
             logger.info(f"Successfully pulled model: {self.model}")
@@ -370,7 +370,7 @@ class OllamaClient:
 
 # Utility functions
 def create_llm_client(model: str = "llama3.2",
-                     temperature: float = 0.7) -> OllamaClient:
+                     temperature: float = 0.4) -> OllamaClient:
     """
     Convenience function to create an LLM client.
     

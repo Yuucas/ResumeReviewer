@@ -159,3 +159,8 @@ site/
 !output/.gitkeep
 !.cache/.gitkeep
 !chroma_db/.gitkeep
+RESTART_INSTRUCTIONS.md
+quick_test.py
+nul
+*.md
+check_chromadb_metadata.py

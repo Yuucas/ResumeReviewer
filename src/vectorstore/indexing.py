@@ -401,6 +401,8 @@ class ResumeChunker:
             'has_skills': metadata.get('search_metadata', {}).get('has_skills'),
             'has_education': metadata.get('search_metadata', {}).get('has_education'),
             'keywords': metadata.get('search_metadata', {}).get('keywords', []),
+            # Include entire extracted_info (containing GitHub URL, etc.)
+            'extracted_info': metadata.get('extracted_info', {}),
         }
         
         return ResumeChunk(

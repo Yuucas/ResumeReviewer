@@ -165,6 +165,9 @@ class DoclingParser:
         
         # 4. EXTRACTED INFO (heuristic extraction from markdown)
         extracted_info = self._extract_heuristic_info(markdown_content)
+        logger.info(f"Extracted info keys: {list(extracted_info.keys())}")
+        if 'github' in extracted_info:
+            logger.info(f"✓ GitHub in extracted_info: {extracted_info['github']}")
         
         # 5. SECTION DETECTION (for better chunking)
         sections = self._detect_sections(markdown_content)
@@ -228,6 +231,9 @@ class DoclingParser:
         github_match = re.search(github_pattern, markdown_content.lower())
         if github_match:
             extracted['github'] = github_match.group(0)
+            logger.info(f"✓ GitHub URL extracted: {github_match.group(0)}")
+        else:
+            logger.warning(f"✗ GitHub URL NOT found in markdown content (length: {len(markdown_content)} chars)")
         
         # Location pattern (City, State ZIP or City, Country)
         location_pattern = r'([A-Z][a-zA-Z\s]+,\s*[A-Z]{2}\s*\d{5})'

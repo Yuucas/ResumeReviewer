@@ -43,13 +43,13 @@ class Config:
     
     # Retrieval settings
     top_k_chunks: int = 50
-    top_k_candidates: int = 5
+    top_k_candidates: int = 3
     min_similarity: float = 0.3
     aggregation_method: str = "weighted"  # "average", "max", or "weighted"
     
     # Reranking settings
     rerank_method: str = "hybrid"  # "keyword", "experience", "section", "hybrid", "llm"
-    rerank_top_k: int = 5
+    rerank_top_k: int = 3
     
     # LLM settings
     temperature: float = 0.3
