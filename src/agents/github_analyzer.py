@@ -45,12 +45,22 @@ class GitHubAnalyzer:
 
     def __init__(self, llm_client=None, github_token: Optional[str] = None):
         self.llm_client = llm_client
+
+        # Try to get token from parameter, then environment variable
+        if github_token is None:
+            import os
+            github_token = os.environ.get('GITHUB_TOKEN')
+
         self.github_token = github_token
         self.api_base = "https://api.github.com"
         self.headers = {"Accept": "application/vnd.github.v3+json"}
+
         if github_token:
             self.headers["Authorization"] = f"token {github_token}"
-        logger.info("GitHubAnalyzer initialized")
+            logger.info("GitHubAnalyzer initialized with authentication token")
+        else:
+            logger.warning("GitHubAnalyzer initialized without token - rate limit: 60 requests/hour")
+            logger.warning("Set GITHUB_TOKEN environment variable for 5,000 requests/hour")
 
     def extract_github_username(self, github_url: str) -> Optional[str]:
         """Extract GitHub username from URL."""
@@ -113,10 +123,91 @@ class GitHubAnalyzer:
             is_fork=repo_data.get('fork', False)
         )
 
-    def analyze_repository_relevance(self, project: GitHubProject, job_description: str) -> Dict[str, Any]:
+    def fetch_readme(self, username: str, repo_name: str) -> Optional[str]:
+        """
+        Fetch README.md content for a repository.
+
+        Returns the README content as plain text, or None if not found.
+        Limits to first 3000 characters to avoid excessive API usage.
+        """
+        try:
+            # Try common README filenames
+            readme_variants = ['README.md', 'readme.md', 'README', 'Readme.md']
+
+            for readme_file in readme_variants:
+                try:
+                    url = f"{self.api_base}/repos/{username}/{repo_name}/contents/{readme_file}"
+                    response = requests.get(url, headers=self.headers, timeout=5)
+
+                    if response.status_code == 200:
+                        data = response.json()
+
+                        # GitHub API returns content in base64
+                        import base64
+                        content = base64.b64decode(data.get('content', '')).decode('utf-8', errors='ignore')
+
+                        # Limit to first 3000 chars to avoid too much data
+                        # and focus on the important parts (usually at the top)
+                        content = content[:3000]
+
+                        # Remove markdown formatting for cleaner text analysis
+                        content = self._clean_markdown(content)
+
+                        logger.debug(f"Fetched README for {username}/{repo_name} ({len(content)} chars)")
+                        return content
+
+                except requests.RequestException:
+                    continue
+
+            # No README found
+            logger.debug(f"No README found for {username}/{repo_name}")
+            return None
+
+        except Exception as e:
+            logger.warning(f"Error fetching README for {username}/{repo_name}: {e}")
+            return None
+
+    def _clean_markdown(self, text: str) -> str:
+        """Remove markdown formatting to get clean text."""
+        # Remove code blocks
+        text = re.sub(r'```[\s\S]*?```', '', text)
+        text = re.sub(r'`[^`]+`', '', text)
+
+        # Remove markdown links but keep text
+        text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
+
+        # Remove images
+        text = re.sub(r'!\[([^\]]*)\]\([^\)]+\)', '', text)
+
+        # Remove headers markdown but keep text
+        text = re.sub(r'^#+\s+', '', text, flags=re.MULTILINE)
+
+        # Remove bold/italic
+        text = re.sub(r'\*\*([^\*]+)\*\*', r'\1', text)
+        text = re.sub(r'\*([^\*]+)\*', r'\1', text)
+        text = re.sub(r'__([^_]+)__', r'\1', text)
+        text = re.sub(r'_([^_]+)_', r'\1', text)
+
+        # Remove horizontal rules
+        text = re.sub(r'^[-*_]{3,}$', '', text, flags=re.MULTILINE)
+
+        # Clean up excessive whitespace
+        text = re.sub(r'\n\s*\n\s*\n', '\n\n', text)
+        text = text.strip()
+
+        return text
+
+    def analyze_repository_relevance(self, project: GitHubProject, job_description: str, readme_content: Optional[str] = None) -> Dict[str, Any]:
         """Analyze how relevant a GitHub project is to the job description."""
         job_keywords = self._extract_technical_keywords(job_description.lower())
+
+        # Build project text from multiple sources
         project_text = f"{project.name} {project.description or ''} {' '.join(project.topics)}"
+
+        # Include README content if available (significantly improves matching)
+        if readme_content:
+            project_text += f" {readme_content}"
+
         project_text_lower = project_text.lower()
 
         matched_keywords = [kw for kw in job_keywords if kw in project_text_lower]
@@ -136,6 +227,14 @@ class GitHubAnalyzer:
             relevance_score += 20
         if topic_matches:
             relevance_score += min(len(topic_matches) * 10, 30)
+
+        # Bonus for having a comprehensive README (shows documentation quality)
+        has_readme = False
+        if readme_content and len(readme_content) > 200:
+            relevance_score += 10
+            has_readme = True
+            logger.debug(f"README bonus applied for {project.name} (length: {len(readme_content)})")
+
         relevance_score = min(relevance_score, 100)
 
         return {
@@ -149,7 +248,8 @@ class GitHubAnalyzer:
             'matched_keywords': matched_keywords,
             'language_match': language_match,
             'topic_matches': topic_matches,
-            'is_significant': project.stars >= 5 or not project.is_fork
+            'is_significant': project.stars >= 5 or not project.is_fork,
+            'has_readme': has_readme
         }
 
     def analyze_github_profile(self, github_url: str, job_description: str, max_repos: int = 30) -> Optional[GitHubAnalysis]:
@@ -173,7 +273,12 @@ class GitHubAnalyzer:
 
         relevant_projects = []
         for project in original_projects[:max_repos]:
-            analysis = self.analyze_repository_relevance(project, job_description)
+            # Fetch README content for better analysis
+            readme_content = self.fetch_readme(username, project.name)
+
+            # Analyze with README content included
+            analysis = self.analyze_repository_relevance(project, job_description, readme_content)
+
             if analysis['relevance_score'] > 20:
                 relevant_projects.append(analysis)
 
