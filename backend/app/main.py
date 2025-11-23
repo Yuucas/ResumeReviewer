@@ -6,7 +6,8 @@ from fastapi.responses import JSONResponse
 import uvicorn
 
 # Use relative imports
-from .api import search, stats, health, upload, debug
+from .api import search, stats, health, upload, debug, history
+from .db.database import init_db
 
 # Create FastAPI app
 app = FastAPI(
@@ -16,6 +17,12 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+
+# Initialize database tables on startup
+@app.on_event("startup")
+async def startup_event():
+    """Initialize database tables."""
+    init_db()
 
 # CORS middleware (allow frontend to access API)
 app.add_middleware(
@@ -32,6 +39,7 @@ app.include_router(search.router, prefix="/api", tags=["search"])
 app.include_router(stats.router, prefix="/api", tags=["statistics"])
 app.include_router(upload.router, prefix="/api", tags=["upload"])
 app.include_router(debug.router, prefix="/api", tags=["debug"])
+app.include_router(history.router, prefix="/api", tags=["history"])
 
 
 @app.get("/")

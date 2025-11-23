@@ -159,6 +159,7 @@ site/
 !output/.gitkeep
 !.cache/.gitkeep
 !chroma_db/.gitkeep
+!README.md
 RESTART_INSTRUCTIONS.md
 quick_test.py
 nul

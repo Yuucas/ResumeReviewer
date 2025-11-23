@@ -35,10 +35,10 @@ class Config:
     cache_embeddings: bool = True
     
     # Chunking settings
-    chunk_size: int = 3000
+    chunk_size: int = 1500
     chunk_overlap: int = 200
-    min_chunk_size: int = 400
-    max_chunk_size: int = 3200
+    min_chunk_size: int = 600
+    max_chunk_size: int = 1500
     chunking_strategy: str = "semantic"  # or "fixed"
     
     # Retrieval settings
@@ -52,9 +52,9 @@ class Config:
     rerank_top_k: int = 3
     
     # LLM settings
-    temperature: float = 0.3
-    max_tokens: int = 2000
-    timeout: int = 120
+    temperature: float = 0.4
+    max_tokens: int = 1200
+    timeout: int = 180
     
     # Logging
     log_level: str = "INFO"
@@ -130,13 +130,13 @@ class Config:
         ollama_base_url=os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434'),
         embedding_model=os.getenv('EMBEDDING_MODEL', 'nomic-embed-text'),
         llm_model=os.getenv('LLM_MODEL', 'qwen3:latest'),
-        chunk_size=int(os.getenv('CHUNK_SIZE', '1000')),
-        chunk_overlap=int(os.getenv('CHUNK_OVERLAP', '200')),
+        chunk_size=int(os.getenv('CHUNK_SIZE', '3000')),
+        chunk_overlap=int(os.getenv('CHUNK_OVERLAP', '300')),
         top_k_chunks=int(os.getenv('TOP_K_CHUNKS', '50')),
         top_k_candidates=int(os.getenv('TOP_K_CANDIDATES', '10')),
         min_similarity=float(os.getenv('MIN_SIMILARITY', '0.3')),
         temperature=float(os.getenv('TEMPERATURE', '0.3')),
-        max_tokens=int(os.getenv('MAX_TOKENS', '2000')),
+        max_tokens=int(os.getenv('MAX_TOKENS', '1000')),
         log_level=os.getenv('LOG_LEVEL', 'INFO'),
     )
 
@@ -161,9 +161,9 @@ def get_config() -> Config:
             _config = Config.from_json(str(config_path))
             logger.info("Loaded config from config.json")
         else:
-            # Fall back to defaults
-            _config = Config()
-            logger.info("Using default configuration")
+            # Fall back to environment variables
+            _config = Config.from_env()
+            logger.info("Using configuration from environment variables")
     
     return _config
 

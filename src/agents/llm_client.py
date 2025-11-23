@@ -9,6 +9,7 @@ import requests
 import json
 from typing import List, Dict, Optional, Any, Generator
 import time
+from src.utils.config import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -20,16 +21,16 @@ class OllamaClient:
     """
     
     def __init__(self,
-                 model: str = "llama3.2",
-                 base_url: str = "http://localhost:11434",
+                 model: str = "qwen3:latest",
+                 base_url: Optional[str] = None,
                  temperature: float = 0.4,
                  max_tokens: int = 3000,
                  timeout: int = 500):
         """
         Initialize Ollama client.
-        
+
         Args:
-            model: Ollama model name (e.g., 'llama3.2', 'llama3.1', 'mistral')
+            model: Ollama model name (e.g., 'qwen3:latest', 'gemma3:4b', 'mistral')
             base_url: Ollama API base URL
             temperature: Sampling temperature (0.0-1.0)
                 - 0.0: Deterministic, focused
@@ -39,7 +40,10 @@ class OllamaClient:
             timeout: Request timeout in seconds
         """
         self.model = model
-        self.base_url = base_url.rstrip('/')
+        if base_url:
+            self.base_url = base_url.rstrip('/')
+        else:
+            self.base_url = get_config().ollama_base_url.rstrip('/')
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.timeout = timeout
@@ -94,7 +98,8 @@ class OllamaClient:
                 temperature: Optional[float] = None,
                 max_tokens: Optional[int] = None,
                 system_prompt: Optional[str] = None,
-                stop_sequences: Optional[List[str]] = None) -> str:
+                stop_sequences: Optional[List[str]] = None,
+                json_mode: bool = False) -> str:
         """
         Generate text from a prompt (non-streaming).
         
@@ -104,6 +109,7 @@ class OllamaClient:
             max_tokens: Override default max tokens
             system_prompt: System message to guide model behavior
             stop_sequences: List of sequences where generation should stop
+            json_mode: Whether to enforce JSON output (Ollama feature)
         
         Returns:
             Generated text
@@ -120,6 +126,10 @@ class OllamaClient:
                 "num_predict": max_tokens if max_tokens is not None else self.max_tokens,
             }
         }
+        
+        # Enable JSON mode if requested
+        if json_mode:
+            request_data["format"] = "json"
         
         # Add system prompt if provided
         if system_prompt:
@@ -339,11 +349,24 @@ class OllamaClient:
                 # Pattern 3: Raw JSON
                 json_text = text
         
+        # Pattern 4: Try to find first { and last }
+        if not json_match:
+            try:
+                start_idx = text.find('{')
+                end_idx = text.rfind('}')
+                if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+                    json_text = text[start_idx:end_idx+1]
+            except Exception:
+                pass
+        
         # Try to parse
         try:
             return json.loads(json_text.strip())
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
             logger.warning("Failed to extract JSON from response")
+            logger.debug(f"JSON parse error: {str(e)}")
+            logger.debug(f"Response preview (first 500 chars): {text[:500]}")
+            logger.debug(f"Extracted text (first 500 chars): {json_text[:500]}")
             return None
     
     def get_model_info(self) -> Dict[str, Any]:
@@ -369,15 +392,15 @@ class OllamaClient:
 
 
 # Utility functions
-def create_llm_client(model: str = "llama3.2",
+def create_llm_client(model: str = "qwen3:latest",
                      temperature: float = 0.4) -> OllamaClient:
     """
     Convenience function to create an LLM client.
-    
+
     Args:
-        model: Model name
+        model: Model name (default: qwen3:latest)
         temperature: Sampling temperature
-    
+
     Returns:
         OllamaClient instance
     """
