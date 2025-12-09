@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Search, BarChart3, Home } from 'lucide-react';
+import { Search, BarChart3, Home, Clock } from 'lucide-react';
 
 const Header = () => {
   const location = useLocation();
@@ -14,7 +14,7 @@ const Header = () => {
             <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-xl">R</span>
             </div>
-            <span className="text-xl font-bold text-gray-900">Resume RAG</span>
+            <span className="text-xl font-bold text-gray-900">Resume Reviewer</span>
           </Link>
 
           <nav className="flex space-x-4">
@@ -46,6 +46,16 @@ const Header = () => {
             >
               <BarChart3 size={18} />
               <span>Statistics</span>
+            </Link>
+
+            <Link
+              to="/history"
+              className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                isActive('/history') || location.pathname.startsWith('/history/') ? 'bg-primary-100 text-primary-700' : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              <Clock size={18} />
+              <span>History</span>
             </Link>
           </nav>
         </div>

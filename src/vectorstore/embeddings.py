@@ -12,6 +12,7 @@ import time
 from pathlib import Path
 import json
 import hashlib
+from src.utils.config import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ class OllamaEmbeddings:
     
     def __init__(self,
                  model: str = "nomic-embed-text",
-                 base_url: str = "http://localhost:11434",
+                 base_url: Optional[str] = None,
                  batch_size: int = 32,
                  normalize: bool = True,
                  cache_embeddings: bool = True,
@@ -45,7 +46,10 @@ class OllamaEmbeddings:
             cache_dir: Directory for caching embeddings
         """
         self.model = model
-        self.base_url = base_url.rstrip('/')
+        if base_url:
+            self.base_url = base_url.rstrip('/')
+        else:
+            self.base_url = get_config().ollama_base_url.rstrip('/')
         self.batch_size = batch_size
         self.normalize = normalize
         self.cache_embeddings = cache_embeddings

@@ -8,8 +8,11 @@ import re
 from typing import List, Dict, Optional, Any
 import requests
 from dataclasses import dataclass
+from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
+
+load_dotenv()
 
 
 @dataclass
@@ -49,7 +52,7 @@ class GitHubAnalyzer:
         # Try to get token from parameter, then environment variable
         if github_token is None:
             import os
-            github_token = os.environ.get('GITHUB_TOKEN')
+            github_token = os.getenv('GITHUB_TOKEN')
 
         self.github_token = github_token
         self.api_base = "https://api.github.com"
@@ -252,8 +255,12 @@ class GitHubAnalyzer:
             'has_readme': has_readme
         }
 
-    def analyze_github_profile(self, github_url: str, job_description: str, max_repos: int = 30) -> Optional[GitHubAnalysis]:
-        """Comprehensive analysis of a candidate's GitHub profile."""
+    def analyze_github_profile(self, github_url: str, job_description: str, max_repos: int = 10) -> Optional[GitHubAnalysis]:
+        """
+        Comprehensive analysis of a candidate's GitHub profile.
+
+        OPTIMIZED: Reduced default max_repos from 30 to 10, and only fetches READMEs for top 5 repos.
+        """
         username = self.extract_github_username(github_url)
         if not username:
             logger.warning(f"Could not extract username from: {github_url}")
@@ -271,17 +278,39 @@ class GitHubAnalyzer:
         projects = [self.parse_repository(repo) for repo in repos_data]
         original_projects = [p for p in projects if not p.is_fork]
 
-        relevant_projects = []
+        # OPTIMIZATION: Quick filter first without README (fast)
+        logger.debug(f"Quick filtering {len(original_projects)} repositories...")
+        quick_analyses = []
         for project in original_projects[:max_repos]:
-            # Fetch README content for better analysis
-            readme_content = self.fetch_readme(username, project.name)
+            # Quick analysis without README
+            analysis = self.analyze_repository_relevance(project, job_description, readme_content=None)
+            quick_analyses.append((project, analysis))
 
-            # Analyze with README content included
-            analysis = self.analyze_repository_relevance(project, job_description, readme_content)
+        # Sort by relevance and get top candidates
+        quick_analyses.sort(key=lambda x: x[1]['relevance_score'], reverse=True)
+        top_candidates = quick_analyses[:min(5, len(quick_analyses))]  # Only analyze top 5 with README
 
-            if analysis['relevance_score'] > 20:
-                relevant_projects.append(analysis)
+        logger.debug(f"Fetching READMEs for top {len(top_candidates)} repositories...")
 
+        # OPTIMIZATION: Parallel README fetching (3x faster!)
+        import concurrent.futures
+
+        def fetch_and_analyze(project_tuple):
+            """Fetch README and analyze in parallel."""
+            project, quick_analysis = project_tuple
+            try:
+                readme_content = self.fetch_readme(username, project.name)
+                analysis = self.analyze_repository_relevance(project, job_description, readme_content)
+                return analysis if analysis['relevance_score'] > 20 else None
+            except Exception as e:
+                logger.warning(f"Error analyzing {project.name}: {e}")
+                return None
+
+        # Fetch READMEs in parallel (up to 3 at a time to avoid rate limiting)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+            results = executor.map(fetch_and_analyze, top_candidates)
+
+        relevant_projects = [r for r in results if r is not None]
         relevant_projects.sort(key=lambda x: x['relevance_score'], reverse=True)
 
         if relevant_projects:

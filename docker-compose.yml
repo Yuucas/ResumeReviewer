@@ -1,8 +1,30 @@
 services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: resume-reviewer-postgres
+    environment:
+      - POSTGRES_DB=ResumeReviewer
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - resume-rag-network
+
   # Ollama service (LLM backend)
   ollama:
     image: ollama/ollama:latest
-    container_name: resume-rag-ollama
+    container_name: resume-reviewer-ollama
     ports:
       - "11434:11434"
     volumes:
@@ -19,9 +41,12 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    container_name: resume-rag-backend
+    container_name: resume-reviewer-backend
     depends_on:
-      - ollama
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_started
     ports:
       - "8000:8000"
     environment:
@@ -33,6 +58,14 @@ services:
       - CACHE_DIR=/app/.cache
       - OUTPUT_DIR=/app/output
       - PYTHONUNBUFFERED=1
+      # PostgreSQL Configuration
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=ResumeReviewer
+      - DATABASE_USER=postgres
+      - DATABASE_PASSWORD=${POSTGRES_PASSWORD}
+      # GitHub Token (optional - set via .env file)
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
     volumes:
       - ./dataset:/app/dataset
       - ./src:/app/src
@@ -49,11 +82,11 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: resume-rag-frontend
+    container_name: resume-reviewer-frontend
     depends_on:
       - backend
     ports:
-      - "3000:80"
+      - "3000:3000"
     environment:
       - VITE_API_URL=http://localhost:8000
     restart: unless-stopped
@@ -90,5 +123,7 @@ networks:
     driver: bridge
 
 volumes:
+  postgres_data:
+    driver: local
   ollama_data:
     driver: local

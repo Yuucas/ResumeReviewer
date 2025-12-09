@@ -280,14 +280,16 @@ class ResumeAnalyzer:
         
         # Get system prompt
         system_prompt = get_system_prompt('recruiter')
-        
         try:
             # Generate analysis with system prompt
+            # OPTIMIZATION: Set to 1500 tokens for complete JSON responses
+            # (was 800, increased to 1200, now 1500 to prevent truncation)
             response = self.llm_client.generate(
                 prompt=prompt,
                 temperature=0.3,
                 max_tokens=1500,
-                system_prompt=system_prompt
+                system_prompt=system_prompt,
+                json_mode=True
             )
             
             # Extract JSON from response
@@ -317,42 +319,71 @@ class ResumeAnalyzer:
     def analyze_candidates_batch(self,
                                  candidates: List,
                                  job_description: str,
-                                 max_candidates: Optional[int] = None) -> List[CandidateAnalysis]:
+                                 max_candidates: Optional[int] = None,
+                                 parallel: bool = True,
+                                 max_workers: int = 3) -> List[CandidateAnalysis]:
         """
         Analyze multiple candidates in batch.
-        
+
         Args:
             candidates: List of CandidateMatch objects
             job_description: Job description
             max_candidates: Maximum number of candidates to analyze (None = all)
-        
+            parallel: Use parallel processing (default: True for speed)
+            max_workers: Number of parallel workers (default: 3)
+
         Returns:
             List of CandidateAnalysis objects
         """
         if max_candidates and len(candidates) > max_candidates:
             candidates = candidates[:max_candidates]
-        
-        logger.info(f"Analyzing {len(candidates)} candidates")
-        
-        analyses = []
-        
-        for i, candidate in enumerate(candidates, 1):
-            logger.info(f"Analyzing candidate {i}/{len(candidates)}")
-            
+
+        logger.info(f"Analyzing {len(candidates)} candidates {'in parallel' if parallel else 'sequentially'}")
+
+        if not parallel or len(candidates) == 1:
+            # Sequential processing (original method)
+            analyses = []
+            for i, candidate in enumerate(candidates, 1):
+                logger.info(f"Analyzing candidate {i}/{len(candidates)}")
+                try:
+                    analysis = self.analyze_candidate(
+                        candidate=candidate,
+                        job_description=job_description,
+                        include_chunks=False
+                    )
+                    analyses.append(analysis)
+                except Exception as e:
+                    logger.error(f"Failed to analyze {candidate.filename}: {str(e)}")
+                    continue
+            return analyses
+
+        # OPTIMIZATION: Parallel processing (3x faster!)
+        import concurrent.futures
+
+        def analyze_one(candidate_tuple):
+            """Analyze one candidate."""
+            i, candidate = candidate_tuple
             try:
-                analysis = self.analyze_candidate(
+                logger.info(f"Analyzing candidate {i+1}/{len(candidates)}: {candidate.filename}")
+                return self.analyze_candidate(
                     candidate=candidate,
                     job_description=job_description,
-                    include_chunks=False  # Don't include chunks in batch to save memory
+                    include_chunks=False
                 )
-                analyses.append(analysis)
-                
             except Exception as e:
                 logger.error(f"Failed to analyze {candidate.filename}: {str(e)}")
-                continue
-        
+                return None
+
+        # Process candidates in parallel
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            indexed_candidates = list(enumerate(candidates))
+            results = executor.map(analyze_one, indexed_candidates)
+
+        # Filter out None results
+        analyses = [r for r in results if r is not None]
+
         logger.info(f"Batch analysis complete: {len(analyses)} successful")
-        
+
         return analyses
     
     def rank_candidates(self,
