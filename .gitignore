@@ -165,3 +165,4 @@ quick_test.py
 nul
 *.md
 check_chromadb_metadata.py
+.env.docker

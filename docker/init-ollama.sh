@@ -3,20 +3,25 @@
 
 set -e
 
-echo "��� Initializing Ollama models..."
+echo "Initialising Ollama models..."
 
 # Wait for Ollama to be ready
-echo "⏳ Waiting for Ollama to start..."
+echo "Waiting for Ollama to start..."
 max_retries=30
 count=0
 
+# Check OLLAMA_HOST env var
+OLLAMA_HOST=${OLLAMA_HOST:-localhost:11434}
+echo "Targeting Ollama at: $OLLAMA_HOST"
+
 while [ $count -lt $max_retries ]; do
-    if curl -f http://localhost:11434/api/tags &>/dev/null; then
+    echo "Attempting to list models..."
+    if ollama list; then
         echo "✅ Ollama is ready!"
         break
     fi
     count=$((count + 1))
-    echo "Waiting... ($count/$max_retries)"
+    echo "Waiting for Ollama... ($count/$max_retries)"
     sleep 2
 done
 
@@ -25,13 +30,32 @@ if [ $count -eq $max_retries ]; then
     exit 1
 fi
 
-# Pull embedding model
-echo "��� Pulling embedding model: nomic-embed-text..."
-ollama pull nomic-embed-text
+# Helper function to pull with retry
+pull_model() {
+    local model=$1
+    local retries=5
+    local count=0
+    
+    echo "⬇️ Pulling model: $model..."
+    
+    while [ $count -lt $retries ]; do
+        if ollama pull "$model"; then
+            echo "✅ Successfully downloaded $model"
+            return 0
+        fi
+        
+        count=$((count + 1))
+        echo "⚠️ Pull failed, retrying... ($count/$retries)"
+        sleep 5
+    done
+    
+    echo "❌ Failed to download $model after $retries attempts"
+    return 1
+}
 
-# Pull LLM model  
-echo "��� Pulling LLM model: qwen3:latest..."
-ollama pull qwen3:latest
+# Pull models
+pull_model "nomic-embed-text"
+pull_model "qwen2.5:latest"
 
 echo "✅ All models ready!"
 ollama list

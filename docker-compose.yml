@@ -32,7 +32,25 @@ services:
       - ./docker/init-ollama.sh:/init-ollama.sh
     environment:
       - OLLAMA_HOST=0.0.0.0:11434
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     restart: unless-stopped
+    networks:
+      - resume-rag-network
+
+  # Ollama Model Initialization
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: resume-reviewer-ollama-init
+    volumes:
+      - ./docker/init-ollama.sh:/init-ollama.sh
+    environment:
+      - OLLAMA_HOST=ollama:11434
+    entrypoint: /bin/bash
+    command: /init-ollama.sh
+    depends_on:
+      - ollama
     networks:
       - resume-rag-network
 
@@ -47,12 +65,14 @@ services:
         condition: service_healthy
       ollama:
         condition: service_started
+      ollama-init:
+        condition: service_completed_successfully
     ports:
       - "8000:8000"
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
       - EMBEDDING_MODEL=nomic-embed-text
-      - LLM_MODEL=qwen3:latest
+      - LLM_MODEL=qwen2.5:latest
       - DATASET_ROOT=/app/dataset
       - CHROMA_DB_PATH=/app/chroma_db
       - CACHE_DIR=/app/.cache
@@ -104,7 +124,7 @@ services:
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
       - EMBEDDING_MODEL=nomic-embed-text
-      - LLM_MODEL=qwen3:latest
+      - LLM_MODEL=qwen2.5:latest
       - DATASET_ROOT=/app/dataset
       - CHROMA_DB_PATH=/app/chroma_db
       - CACHE_DIR=/app/.cache

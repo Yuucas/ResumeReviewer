@@ -26,7 +26,7 @@ class Config:
     # Ollama settings
     ollama_base_url: str = "http://localhost:11434"
     embedding_model: str = "nomic-embed-text"
-    llm_model: str = "qwen3:latest"
+    llm_model: str = "qwen2.5:latest"
     
     # Embedding settings
     embedding_dimension: int = 768
